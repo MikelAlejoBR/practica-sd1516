@@ -1,0 +1,1 @@
+#define EPERM 1 /* Permisos insuficientes */
