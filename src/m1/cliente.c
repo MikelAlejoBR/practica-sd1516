@@ -9,6 +9,6 @@ int main(int argc, char *argv[]) {
 		fprintf(stderr, "El programa ha de ejecutarse sin parámetros. Uso: %s", argv[0]);
 		exit(EXIT_FAILURE);
 	}
-
-	exit(EXIT_FAILURE);
+	
+	exit(EXIT_SUCCESS);
 }
