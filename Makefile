@@ -8,7 +8,7 @@ MOD4=src/m4/
 all: moduloUno moduloDos moduloTres moduloCuatro
 
 moduloUno: $(MOD1)cliente.c
-	gcc -o $(BIN)cliente $(MOD1)cliente.c -I.
+	gcc -o $(BIN)cliente $(MOD1)cliente.c $(MOD1)protocolo.c -I.
 
 #moduloDos: $(MOD1)cliente.c
 #	gcc -o $(BIN)cliente $(MOD2)cliente.c -I.
