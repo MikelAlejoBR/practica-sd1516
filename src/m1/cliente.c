@@ -7,8 +7,8 @@
 int main(int argc, char *argv[]) {
 	if (argc > 1) {
 		fprintf(stderr, "El programa ha de ejecutarse sin parámetros. Uso: %s", argv[0]);
-		exit(-1);
+		exit(EXIT_FAILURE);
 	}
 
-	exit(0);
+	exit(EXIT_FAILURE);
 }
