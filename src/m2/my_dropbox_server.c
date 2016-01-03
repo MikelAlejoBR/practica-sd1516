@@ -1,7 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <errno.h>
 #include <sys/types.h>
+#include <string.h>
 
 //Incluidos por Marcos
 #include <sys/syscall.h>
@@ -11,18 +13,24 @@
 #include <netinet/in.h>
 #include <sys/select.h>
 #include <signal.h>
-#include <time.h>
+#include "my_dropbox_server.h"
 
 #define MAX_BUF 1024
 #define PORT 6012
 #define FILENAME  "./MiNube/"
 
+char ack[4];
+
 int main(int arhc, char *argv[])
 {
-	int sock, n1, n2, usuario, comando, dialogo;   //socket, numero de bytes, numero de usuario, numero de comando, nuevo socket
+	int sock, n, usuario, dialogo;   //socket, numero de bytes, numero de usuario, numero de comando, nuevo socket
 	struct sockaddr_in dir_serv, dir_cli;
 	char buf[MAX_BUF];
 	socklen_t tam_dir;
+	
+	struct timeval timeout;      
+    timeout.tv_sec = 10;
+    timeout.tv_usec = 0;
 
 	// Crear el socket
 	if((sock = socket(AF_INET, SOCK_DGRAM, 0)) < 0)
@@ -49,9 +57,21 @@ int main(int arhc, char *argv[])
 	// Tamaño de la direccion IP del cliente
 	tam_dir = sizeof(dir_cli);
 	
+	if(setsockopt (sock, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout, sizeof(timeout)) < 0)
+	{
+		close(sock);
+		exit(1);
+	}	
+	
+	if(setsockopt (sock, SOL_SOCKET, SO_SNDTIMEO, (char *)&timeout, sizeof(timeout)) < 0)
+	{
+		close(sock);
+		exit(1);
+	}
+	
 	while(1){
 		//PETICION DE CONEXION DE CLIENTE
-		n1=recvfrom(sock, buf, MAX_BUF, 0, (struct sockaddr *) &dir_cli, &tam_dir);
+		n=recvfrom(sock, buf, MAX_BUF, 0, (struct sockaddr *) &dir_cli, &tam_dir);
 		if(n > 3 || !strcmp(buf, comandos[0]))
 		{
 			perror("Error al recibir el mensaje de conexion");
@@ -77,21 +97,30 @@ int main(int arhc, char *argv[])
 
 void update(sock)
 {
-	int n, rc;  // numero de bytes
-	char buf[MAX_BUF], error[MAX_BUF], nombre[MAX_BUF];
+	int leido = 0, comando, tam_file;
+	int n, aux, rc;  // numero de bytes
+	char buf[MAX_BUF], error[MAX_BUF], nombre[MAX_BUF], nombre_copia[MAX_BUF];
+	char * cmd;
 	
-	int file_size;
-    FILE *received_file;
+	int file_size, parte, estado;
+    FILE *rec_file;
     int dat_f = 0;
 	ssize_t len;
 
-	// Establecer estado como inicial
-	estado = ST_INIT;
-
 	// Leer lo enviado por el cliente
-	if((n=read(sock,buf,MAX_BUF)) <= 0)
-		return;
-
+	do
+	{
+		if((n=read(sock,buf,MAX_BUF)) < 0)
+		{
+			sprintf(error,"%s:2\n",comandos[4]);
+			write(sock,error,6);	
+		}else{
+			leido = 1;
+		}
+	}while (leido ==0);
+	
+	leido = 0;
+	
 	// Comprobar si el comando es conocido
 	if((comando=busca_substring(buf,comandos)) < 0)
 	{
@@ -103,43 +132,62 @@ void update(sock)
 	switch(comando)
 	{
 		case COM_TRF:
-			if(estado != ST_INIT) // Comprobar si el estado es el esperado
-			{
-				printf("Error de estado/n");
-				exit(1);
-			}
 			buf[n] = 0;	// Borrar EOL
 			
 			estado = COM_TRF;
 
 			/* GUARDAR NOMBRE DE COPIA DE FICHERO PREVIO AL BORRADO */
-			sprintf(nombre,"s%s",FILENAME,buf+4);
-			sprintf(nombre_copia,"s%s_minubeCOPY",FILENAME,buf+4);
+			sprintf(nombre,"%s%s",FILENAME,buf+4);
+			sprintf(nombre_copia,"%s%s_minubeCOPY",FILENAME,buf+4);
 			
 			sprintf(ack,"%s\n",comandos[3]);
 			write(sock, ack, 4); //ACK DE CONFIRMACION
 			
 			/* REALIZAR LA COPIA DEL FICHERO CON EL COMANDO cp */
-			sprintf(comando,"cp %s %s",nombre,nombre_copia);
-			system(comando);
+			sprintf(cmd,"cp %s %s",nombre,nombre_copia);
+			system(cmd);
 			
 			remove(nombre);
 			
 			//http://stackoverflow.com/questions/11952898/c-send-and-receive-file
 			/* RECIBIR TAMAÑO DEL FICHERO*/
-			recv(sock, buf, MAX_BUF, 0);
-			tam_file = atoi(buffer);
+			do
+			{
+				if((n=recv(sock, buf, MAX_BUF, 0)) < 0)
+				{
+					sprintf(error,"%s:3\n",comandos[4]);
+					write(sock,error,6);	
+				}else{
+					leido = 1;
+				}
+			}while (leido ==0);
+			
+			leido = 0;
+			//tam_file = atoi(buffer);
+			tam_file = atoi(buf);
+			aux = tam_file;
 
 			/* CREACIÓN DEL FICHERO ACTUALIZADO */
 			rec_file = fopen(nombre, "w");
 
 			/* RECEPCIÓN DEL CONTENIDO DEL FICHERO */
-			while (((parte = recv(sock, buf, MAX_BUF, 0)) > 0) && (tam_file > 0))
-			{
-				fwrite(buf, sizeof(char), parte, rec_file);
-				tam_file -= parte;
-				//fprintf(stdout, "Receive %d bytes and we hope :- %d bytes\n", parte, tam_file);
+			while (leido == 0){
+				while (((parte = recv(sock, buf, MAX_BUF, 0)) > 0) && (tam_file > 0))
+				{
+					fwrite(buf, sizeof(char), parte, rec_file);
+					tam_file -= parte;
+				}
+				
+				if(tam_file == 0)
+				{
+					leido = 1;
+				}else{
+					tam_file = aux;
+					sprintf(error,"%s:4\n",comandos[4]);
+					write(sock,error,6);	
+				} 
 			}
+			leido = 0;
 			
 			/* CIERRE DEL FICHERO */
 			fclose(rec_file);
@@ -151,33 +199,38 @@ void update(sock)
 			
 			break; //se termina la conexion
 			
-		case COM_DEL:
-			if(estado != ST_INIT) // Comprobar si el estado es el esperado
-			{
-				printf("Error de estado/n");
-				exit(1);
-			}
-			
+		case COM_DEL:	
 			buf[n] = 0;	// Borrar EOL
 			estado = COM_DEL;
 			
-			sprintf(nombre,"s%s",FILENAME,buf+4);
+			sprintf(nombre,"%s%s",FILENAME,buf+4);
 
 			remove(nombre);
 			
 			sprintf(ack,"%s\n",comandos[3]);
 			write(sock, ack, 4); //ACK DE CONFIRMACION
 			
-			break; //se termina la conexion
-			
-		case COM_FIN:
-			if(estado != COM_TRF || estado != COM_DEL)
-			{
-				printf("Error de estado/n");
-				exit(1);
-			}
-			return;
+			break; //se termina la conexion			
 	}
+	
+	do
+	{
+		if((n=read(sock,buf,MAX_BUF)) < 0)
+		{
+			sprintf(error,"%s:2\n",comandos[4]);
+			write(sock,error,6);	
+		}else{
+			buf[n]= 0;
+			if(strcmp(buf,comandos[5])){
+				leido = 1;
+			} else{
+				sprintf(error,"%s:5\n",comandos[4]);
+				write(sock,error,6);
+			}
+		}
+	}while (leido ==0);
+
+	return;
 }
 
 /*
