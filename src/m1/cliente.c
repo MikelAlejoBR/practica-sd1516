@@ -10,6 +10,7 @@
 #include "protocolo.h"
 #include "inotify.h"
 
+
 int main(int argc, char *argv[]) {
 	
 	if (argc > 1) {
