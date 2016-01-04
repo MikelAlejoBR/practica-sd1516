@@ -7,9 +7,10 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <unistd.h>
+#include <sys/stat.h>
 
 #include "protocolo.h"
-
+struct stat fileinfo
 int sendack(int sock) {
 	int bsent;
 	bsent = write(sock, "ACK", sizeof("ACK"));
@@ -28,6 +29,36 @@ int senderr(int sock, int ecode) {
 	if(bsent < sizeof(errbuff))
 		return(-1);
 	return 0;
+}
+
+int sendFile(int sock, char * file){
+    int bsent;
+    if(stat(param, &fileinfo)<0)
+        fprintf(stderr,"Fichero no encontrado\n");
+    else
+    {
+        bsent=write(sock, "TRF;" , sizeof("TRF;"));
+        if(bsent < sizeof(errbuff))
+            return(-1);
+        bsent=write(sock, file, sizeof(file));
+        if(bsent < sizeof(errbuff))
+            return(-1);
+        bsent=write(sock, ";" , sizeof(";"));
+        if(bsent < sizeof(errbuff))
+            return(-1);
+        int tam= fileinfo.st_size;
+        char str[20];
+        sprintf(str,tam);
+        bsent=write(sock, str , sizeof(str));
+        if(bsent < sizeof(errbuff))
+            return(-1);
+        bsent=write(sock, ";" , sizeof(";"));
+        if(bsent < sizeof(errbuff))
+            return(-1);
+        /*enviar fichero a trozos*/
+        
+        
+    
 }
 
 int sendfin(int sock) {

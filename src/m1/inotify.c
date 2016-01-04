@@ -26,7 +26,7 @@ static int handle_events(int fd, int *wd, int wdlen, char* dir)
 	char buf[EVBUFF_SIZE] 
 	__attribute__ ((aligned(__alignof__(struct inotify_event))));
 	const struct inotify_event *event;
-	int i;
+	int i=0;
 	ssize_t len;
 	char *ptr;
 	
@@ -59,29 +59,32 @@ static int handle_events(int fd, int *wd, int wdlen, char* dir)
 		/* Print event type */
 		
 		if (event->mask & IN_ATTRIB)
-			printf("Attributes changed: ");
+			printf("Attributes changed: \n");
 		if (event->mask & IN_CREATE)
-			printf("File created: ");
+			printf("File created: %s\n");
 		if (event->mask & IN_DELETE_SELF)
-			printf("File deleted: ");
+			printf("File self deleted: \n");
+                if (event->mask & IN_DELETE)
+			printf("File deleted: \n");
 		if (event->mask & IN_MODIFY)
-			printf("File modified: ");
+			printf("File modified: \n");
 		if (event->mask & IN_MOVED_FROM)
-			printf("File moved: ");
+			printf("File moved: \n");
 		if (event->mask & IN_MOVED_TO)
-			printf("In moved to: ");
+			printf("In moved to: \n");
 		
 		/* Print the name of the watched directory */
-		
+                printf("%d\n",i);
+
 		if (wd[i] == event->wd) {
 			printf("%s/", dir);
-			break;
+			//break;
 		}
 		
 		/* Print the name of the file */
 		
 		if (event->len)
-			printf("%s", event->name);
+			printf("%s\n", event->name);
 		
 		/* Print type of filesystem object */
 		
@@ -99,6 +102,7 @@ int inotify(char dir[]) {
 	int *wd;
 	nfds_t nfds;
 	struct pollfd fds[2];
+        i=0;
 	
 	/* Create the file descriptor for accessing the inotify API */
 	
@@ -115,7 +119,7 @@ int inotify(char dir[]) {
 		perror("calloc");
 		return(-1);
 	}
-	
+	printf("%d\n",i);
 	wd[i] = inotify_add_watch(fd, dir, IN_ATTRIB | IN_CREATE | 
 	IN_MODIFY | IN_DELETE | 
 	IN_DELETE_SELF 

@@ -18,7 +18,7 @@ int main(int argc, char *argv[]) {
 	}
 	
 	char directorio[] = 
-		"/home/USR/practica-sd1516/src/m1/testdir";
+		"/home/duffy/testdir";
 	inotify(directorio);
 	
 	exit(EXIT_SUCCESS);
