@@ -15,25 +15,21 @@
 #include <signal.h>
 #include "my_dropbox_server.h"
 
-#define MAX_BUF 1024
-#define PORT 6012
-#define FILENAME  "./MiNube/"
-
 char ack[4];
 
 int main(int arhc, char *argv[])
 {
-	int sock, n, usuario, dialogo;   //socket, numero de bytes, numero de usuario, numero de comando, nuevo socket
+	int sock, n, l;   //socket, numero de bytes, numero de usuario, numero de comando, nuevo socket
 	struct sockaddr_in dir_serv, dir_cli;
 	char buf[MAX_BUF];
-	socklen_t tam_dir;
+	socklen_t sin_size, tam_dir;
 	
 	struct timeval timeout;      
     timeout.tv_sec = 10;
     timeout.tv_usec = 0;
 
 	// Crear el socket
-	if((sock = socket(AF_INET, SOCK_DGRAM, 0)) < 0)
+	if((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0)
 	{
 		perror("Error al crear el socket");
 		exit(1);
@@ -51,12 +47,10 @@ int main(int arhc, char *argv[])
 		exit(1);
 	}
 	
-	// Ignorar la senal enviada cuando un proceso hijo acaba, para que no quede como zombi
-	signal(SIGCHLD, SIG_IGN);
-		
 	// Tamaño de la direccion IP del cliente
 	tam_dir = sizeof(dir_cli);
 	
+	// Añadimos timeouts en las operaciones de entrada y salida del socket
 	if(setsockopt (sock, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout, sizeof(timeout)) < 0)
 	{
 		close(sock);
@@ -69,27 +63,28 @@ int main(int arhc, char *argv[])
 		exit(1);
 	}
 	
+	//Nos quedamos a la escucha de una conexion
+	listen(sock, 1);
+	sin_size = sizeof(struct sockaddr_in);
+	
 	while(1){
+		if ((l = accept(sock,(struct sockaddr *)&dir_cli,&sin_size)) < 0)
+			return 0;
+			
 		//PETICION DE CONEXION DE CLIENTE
-		n=recvfrom(sock, buf, MAX_BUF, 0, (struct sockaddr *) &dir_cli, &tam_dir);
+		//n=recvfrom(sock, buf, MAX_BUF, 0, (struct sockaddr *) &dir_cli, &tam_dir);
+		n = read(sock,buf,MAX_BUF);
 		if(n > 3 || !strcmp(buf, comandos[0]))
 		{
 			perror("Error al recibir el mensaje de conexion");
 			exit(1);
 		}	
 
-		// Solicitamos conexion de cliente
-		if(connect(sock, (struct sockaddr *) &dir_cli, tam_dir) < 0)
-		{
-			perror("Error al conectar el socket TCP con el del cliente/r/n");
-			exit(1);
-		}
 		sprintf(ack,"%s\n",comandos[3]);
 		write(sock, ack, 4); //ACK DE CONFIRMACION
 
 		// Iniciamos la actualizacion
 		update(sock);	
-	
 		close(sock);
 		//exit(0);
 	}
@@ -97,44 +92,28 @@ int main(int arhc, char *argv[])
 
 void update(sock)
 {
-	int leido = 0, comando, tam_file;
-	int n, aux, rc;  // numero de bytes
-	char buf[MAX_BUF], error[MAX_BUF], nombre[MAX_BUF], nombre_copia[MAX_BUF];
+	int leido = 0;
+	int comando, tam_file;
+	int n;  // numero de bytes
+	char buf[MAX_BUF], nombre[MAX_BUF], nombre_copia[MAX_BUF];
 	char * cmd;
 	
-	int file_size, parte, estado;
     FILE *rec_file;
-    int dat_f = 0;
-	ssize_t len;
+	ssize_t parte;
 
 	// Leer lo enviado por el cliente
-	do
-	{
-		if((n=read(sock,buf,MAX_BUF)) < 0)
-		{
-			sprintf(error,"%s:2\n",comandos[4]);
-			write(sock,error,6);	
-		}else{
-			leido = 1;
-		}
-	}while (leido ==0);
-	
-	leido = 0;
+	if((n=read(sock,buf,MAX_BUF)) < 0)
+		return;	
 	
 	// Comprobar si el comando es conocido
 	if((comando=busca_substring(buf,comandos)) < 0)
-	{
-		sprintf(error,"%s:1\n",comandos[4]);
-		write(sock,error,6);
-	}
+		return;
 	
 	// Realizar la operacion correspondiente segun el comando recibido
 	switch(comando)
 	{
 		case COM_TRF:
 			buf[n] = 0;	// Borrar EOL
-			
-			estado = COM_TRF;
 
 			/* GUARDAR NOMBRE DE COPIA DE FICHERO PREVIO AL BORRADO */
 			sprintf(nombre,"%s%s",FILENAME,buf+4);
@@ -151,43 +130,24 @@ void update(sock)
 			
 			//http://stackoverflow.com/questions/11952898/c-send-and-receive-file
 			/* RECIBIR TAMAÑO DEL FICHERO*/
-			do
-			{
-				if((n=recv(sock, buf, MAX_BUF, 0)) < 0)
-				{
-					sprintf(error,"%s:3\n",comandos[4]);
-					write(sock,error,6);	
-				}else{
-					leido = 1;
-				}
-			}while (leido ==0);
-			
-			leido = 0;
+			if((n=recv(sock, buf, MAX_BUF, 0)) < 0)
+				return;
+
 			//tam_file = atoi(buffer);
 			tam_file = atoi(buf);
-			aux = tam_file;
 
 			/* CREACIÓN DEL FICHERO ACTUALIZADO */
 			rec_file = fopen(nombre, "w");
 
 			/* RECEPCIÓN DEL CONTENIDO DEL FICHERO */
-			while (leido == 0){
-				while (((parte = recv(sock, buf, MAX_BUF, 0)) > 0) && (tam_file > 0))
-				{
-					fwrite(buf, sizeof(char), parte, rec_file);
-					tam_file -= parte;
-				}
-				
-				if(tam_file == 0)
-				{
-					leido = 1;
-				}else{
-					tam_file = aux;
-					sprintf(error,"%s:4\n",comandos[4]);
-					write(sock,error,6);	
-				} 
+			while (((parte = recv(sock, buf, MAX_BUF, 0)) > 0) && (tam_file > 0))
+			{
+				fwrite(buf, sizeof(char), parte, rec_file);
+				tam_file -= parte;
 			}
-			leido = 0;
+			
+			if(tam_file != 0)
+				return;	
 			
 			/* CIERRE DEL FICHERO */
 			fclose(rec_file);
@@ -197,11 +157,10 @@ void update(sock)
 			sprintf(ack,"%s\n",comandos[3]);
 			write(sock, ack, 4); //ACK DE CONFIRMACION
 			
-			break; //se termina la conexion
+			return; //se termina la conexion
 			
 		case COM_DEL:	
 			buf[n] = 0;	// Borrar EOL
-			estado = COM_DEL;
 			
 			sprintf(nombre,"%s%s",FILENAME,buf+4);
 
@@ -210,45 +169,10 @@ void update(sock)
 			sprintf(ack,"%s\n",comandos[3]);
 			write(sock, ack, 4); //ACK DE CONFIRMACION
 			
-			break; //se termina la conexion			
+			return; //se termina la conexion			
 	}
-	
-	do
-	{
-		if((n=read(sock,buf,MAX_BUF)) < 0)
-		{
-			sprintf(error,"%s:2\n",comandos[4]);
-			write(sock,error,6);	
-		}else{
-			buf[n]= 0;
-			if(strcmp(buf,comandos[5])){
-				leido = 1;
-			} else{
-				sprintf(error,"%s:5\n",comandos[4]);
-				write(sock,error,6);
-			}
-		}
-	}while (leido ==0);
-
-	return;
 }
 
-/*
-* Busca el string 'string' en el array de strings 'strings'. El último elemento del array 'strings' ha de ser NULL.
-* Devuelve el índice de la primera aparición de 'string' en 'strings'. Si 'string' no esta en el array, devuelve un valor negativo.
-*/
-
-int busca_string(char *string, char **strings)
-{
-	int i=0;
-	while(strings[i] != NULL)
-	{
-		if(!strcmp(string,strings[i]))
-			return i;
-		i++;
-	}
-	return -1;
-}
 
 /*
 * Busca si el string 'string' comienza con algún string contenido en el array de strings 'strings'. El último elemento del array 'strings' ha de ser NULL.
