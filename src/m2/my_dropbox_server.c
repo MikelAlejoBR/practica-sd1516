@@ -73,18 +73,30 @@ int main(int arhc, char *argv[])
 			
 		//PETICION DE CONEXION DE CLIENTE
 		//n=recvfrom(sock, buf, MAX_BUF, 0, (struct sockaddr *) &dir_cli, &tam_dir);
-		n = read(sock,buf,MAX_BUF);
-		if(n > 3 || !strcmp(buf, comandos[0]))
+		//if ((n = read(sock,buf,MAX_BUF)) < 0 ){
+		if ((n = read(l,buf,MAX_BUF)) < 0 ){
+			perror("Error al recibir la peticion de conexion del cliente");
+		}
+
+		//printf("comando = %s, strlen = %lu, buf = %s, strlen = %lu\n", comandos[0], strlen(comandos[0]), buf, strlen(buf));
+		//if(n > 3 || !strncmp(buf, comandos[0], 3))
+		if(n != 4 || strncmp(buf, comandos[0], 3) != 0)
 		{
-			perror("Error al recibir el mensaje de conexion");
+			perror("El mensaje recibido no es el de conexion [CON].");
 			exit(1);
 		}	
-
-		sprintf(ack,"%s\n",comandos[3]);
-		write(sock, ack, 4); //ACK DE CONFIRMACION
-
+		
+		//Construir el comando a ejecutar
+		if (sprintf(ack,"%s",comandos[3]) < 0)
+			perror("sprintf ");
+		
+		//if (write(sock, ack, 4) < 0)
+		if (write(l, ack, 4) < 0)
+			perror("write 1 "); // ACK CONFIRMACION
+	
 		// Iniciamos la actualizacion
-		update(sock);	
+		//update(sock);	
+		update(l);
 		close(sock);
 		//exit(0);
 	}
@@ -103,11 +115,11 @@ void update(sock)
 
 	// Leer lo enviado por el cliente
 	if((n=read(sock,buf,MAX_BUF)) < 0)
-		return;	
-	
+		perror("read");	
+	printf("Comando recibido: %s\n", buf);
 	// Comprobar si el comando es conocido
 	if((comando=busca_substring(buf,comandos)) < 0)
-		return;
+		perror("comando");
 	
 	// Realizar la operacion correspondiente segun el comando recibido
 	switch(comando)
@@ -119,7 +131,7 @@ void update(sock)
 			sprintf(nombre,"%s%s",FILENAME,buf+4);
 			sprintf(nombre_copia,"%s%s_minubeCOPY",FILENAME,buf+4);
 			
-			sprintf(ack,"%s\n",comandos[3]);
+			sprintf(ack,"%s",comandos[3]);
 			write(sock, ack, 4); //ACK DE CONFIRMACION
 			
 			/* REALIZAR LA COPIA DEL FICHERO CON EL COMANDO cp */
@@ -154,19 +166,19 @@ void update(sock)
 			
 			remove(nombre_copia);
 			
-			sprintf(ack,"%s\n",comandos[3]);
+			sprintf(ack,"%s",comandos[3]);
 			write(sock, ack, 4); //ACK DE CONFIRMACION
 			
 			return; //se termina la conexion
 			
 		case COM_DEL:	
 			buf[n] = 0;	// Borrar EOL
-			
+	
 			sprintf(nombre,"%s%s",FILENAME,buf+4);
 
 			remove(nombre);
 			
-			sprintf(ack,"%s\n",comandos[3]);
+			sprintf(ack,"%s",comandos[3]);
 			write(sock, ack, 4); //ACK DE CONFIRMACION
 			
 			return; //se termina la conexion			
