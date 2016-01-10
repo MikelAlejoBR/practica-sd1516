@@ -19,6 +19,9 @@ char ack[4];
 
 int main(int arhc, char *argv[])
 {
+	// char * txt = "REN;hola.txt;adios.txt";
+	// printf("posicion = %d", posc(txt, ';'));
+
 	int sock, n, l;   //socket, numero de bytes, numero de usuario, numero de comando, nuevo socket
 	struct sockaddr_in dir_serv, dir_cli;
 	char buf[MAX_BUF];
@@ -72,14 +75,10 @@ int main(int arhc, char *argv[])
 			return 0;
 			
 		//PETICION DE CONEXION DE CLIENTE
-		//n=recvfrom(sock, buf, MAX_BUF, 0, (struct sockaddr *) &dir_cli, &tam_dir);
-		//if ((n = read(sock,buf,MAX_BUF)) < 0 ){
 		if ((n = read(l,buf,MAX_BUF)) < 0 ){
 			perror("Error al recibir la peticion de conexion del cliente");
 		}
 
-		//printf("comando = %s, strlen = %lu, buf = %s, strlen = %lu\n", comandos[0], strlen(comandos[0]), buf, strlen(buf));
-		//if(n > 3 || !strncmp(buf, comandos[0], 3))
 		if(n != 4 || strncmp(buf, comandos[0], 3) != 0)
 		{
 			perror("El mensaje recibido no es el de conexion [CON].");
@@ -89,37 +88,40 @@ int main(int arhc, char *argv[])
 		//Construir el comando a ejecutar
 		if (sprintf(ack,"%s",comandos[3]) < 0)
 			perror("sprintf ");
-		
-		//if (write(sock, ack, 4) < 0)
 		if (write(l, ack, 4) < 0)
 			perror("write 1 "); // ACK CONFIRMACION
 	
 		// Iniciamos la actualizacion
-		//update(sock);	
 		update(l);
+
+		if ((n = read(l,buf,MAX_BUF)) < 0 ){
+			perror("Error al recibir la peticion de desconexion del cliente");
+		}
+		if(n != 4 || strncmp(buf, comandos[5], 3) != 0)
+		{
+			perror("El mensaje recibido no es el de conexion [FIN].");
+			exit(1);
+		}
 		close(sock);
-		//exit(0);
 	}
 }
 
 void update(sock)
 {
 	int leido = 0;
-	int comando, tam_file;
-	int n;  // numero de bytes
-	char buf[MAX_BUF], nombre[MAX_BUF], nombre_copia[MAX_BUF];
-	char * cmd;
+	int comando, tam_file, i, n;
+	char buf[MAX_BUF], temp[MAX_BUF], nombre[MAX_BUF], nombre_copia[MAX_BUF], nombre_nuevo[MAX_BUF], cmd[MAX_BUF];
 	
     FILE *rec_file;
 	ssize_t parte;
 
 	// Leer lo enviado por el cliente
 	if((n=read(sock,buf,MAX_BUF)) < 0)
-		perror("read");	
+		perror("ERROR al leer el comando enviado por el cliente.");	
 	printf("Comando recibido: %s\n", buf);
 	// Comprobar si el comando es conocido
 	if((comando=busca_substring(buf,comandos)) < 0)
-		perror("comando");
+		perror("Encontrar el comando");
 	
 	// Realizar la operacion correspondiente segun el comando recibido
 	switch(comando)
@@ -129,6 +131,9 @@ void update(sock)
 
 			/* GUARDAR NOMBRE DE COPIA DE FICHERO PREVIO AL BORRADO */
 			sprintf(nombre,"%s%s",FILENAME,buf+4);
+			//sprintf(nombre,"%s",buf+4);
+			
+			sprintf(nombre_copia,"%s_minubeCOPY",buf+4);
 			sprintf(nombre_copia,"%s%s_minubeCOPY",FILENAME,buf+4);
 			
 			sprintf(ack,"%s",comandos[3]);
@@ -140,7 +145,6 @@ void update(sock)
 			
 			remove(nombre);
 			
-			//http://stackoverflow.com/questions/11952898/c-send-and-receive-file
 			/* RECIBIR TAMAÑO DEL FICHERO*/
 			if((n=recv(sock, buf, MAX_BUF, 0)) < 0)
 				return;
@@ -174,6 +178,7 @@ void update(sock)
 		case COM_DEL:	
 			buf[n] = 0;	// Borrar EOL
 	
+			//sprintf(nombre,"%s",FILENAME,buf+4);
 			sprintf(nombre,"%s%s",FILENAME,buf+4);
 
 			remove(nombre);
@@ -181,10 +186,53 @@ void update(sock)
 			sprintf(ack,"%s",comandos[3]);
 			write(sock, ack, 4); //ACK DE CONFIRMACION
 			
-			return; //se termina la conexion			
+			return; //se termina la conexion
+			
+		case COM_REN:	
+			buf[n] = 0;	// Borrar EOL
+			i = posc(buf+4,';');
+
+			strncpy(temp, buf+4,i-1);
+			temp[i-1] = 0;
+			sprintf(nombre,"%s%s",FILENAME,temp);
+
+			//i = posc(buf+4,';');
+			sprintf(nombre_nuevo,"%s%s",FILENAME,buf+i+4);
+			//printf("Nombre antiguo: %s; Nombre nuevo:%s\n",nombre,nombre_nuevo);
+			//printf("ant: %lu, nue: %lu\n",strlen(nombre), strlen(nombre_nuevo));
+
+			sprintf(cmd,"mv %s %s",nombre,nombre_nuevo);
+			//sprintf(cmd,"cp %s %s",nombre,nombre_nuevo);
+			
+			if (printf("%s\n",cmd) < 0){
+				perror("impr cmd");
+			}
+			system(cmd);
+			
+			//remove(nombre);
+			
+			sprintf(ack,"%s",comandos[3]);
+			write(sock, ack, 4); //ACK DE CONFIRMACION
+			
+			return; //se termina la conexion	
 	}
 }
 
+/*
+* Funcion que devuelve la ultima posicion del elemento ";" dado una cadena de caracteres
+*/
+int posc( char cad[], char c)
+{
+   int pos = -1;
+   int len = strlen( cad);
+   
+   for( int i = 0; /*pos == -1 && */i < len; i++){ // si quitas la condición pos == -1
+            // te devuelve la última posición encontrada (si es que hay más de 1)
+      if(*(cad+i) == c)
+         pos = i+1;
+   }
+   return pos;
+}
 
 /*
 * Busca si el string 'string' comienza con algún string contenido en el array de strings 'strings'. El último elemento del array 'strings' ha de ser NULL.
