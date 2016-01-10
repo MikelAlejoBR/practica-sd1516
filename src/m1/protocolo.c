@@ -104,7 +104,7 @@ int sendFile(int sock, char * file){
 		bsent=write(sock, "TRF;" , sizeof("TRF;"));
 		if(bsent < sizeof("TRF;"))
 			return(-1);
-		bsent=write(sock, file, sizeof(file));
+		bsent=write(sock, file, strlen(file));
 		if(bsent < sizeof(file))
 			return(-1);
 		bsent=write(sock, ";" , sizeof(";"));
