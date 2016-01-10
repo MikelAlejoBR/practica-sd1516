@@ -20,7 +20,7 @@ char ack[4];
 
 int main(int arhc, char *argv[])
 {
-	int sock, n, l;   //socket, numero de bytes, numero de usuario, numero de comando, nuevo socket
+	int sock, n, s_up;   //socket, numero de bytes, numero de usuario, numero de comando, nuevo socket
 	struct sockaddr_in dir_serv, dir_cli;
 	char buf[MAX_BUF];
 	socklen_t sin_size, tam_dir;
@@ -56,52 +56,58 @@ int main(int arhc, char *argv[])
 	sin_size = sizeof(struct sockaddr_in);
 	
 	while(1){
-		if ((l = accept(sock,(struct sockaddr *)&dir_cli,&sin_size)) < 0)
+		if ((s_up = accept(sock,(struct sockaddr *)&dir_cli,&sin_size)) < 0)
 			return 0;
-			
-		// Añadimos timeouts en las operaciones de entrada y salida del socket
-		if(setsockopt (l, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout, sizeof(timeout)) < 0)
-		{
-			close(sock);
-			exit(1);
-		}	
 		
-		if(setsockopt (l, SOL_SOCKET, SO_SNDTIMEO, (char *)&timeout, sizeof(timeout)) < 0)
+		// Añadimos timeouts en las operaciones de entrada y salida del socket
+		if(setsockopt (s_up, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout, sizeof(timeout)) < 0)
 		{
-			close(sock);
+			close(s_up);
+		}	
+	
+		if(setsockopt (s_up, SOL_SOCKET, SO_SNDTIMEO, (char *)&timeout, sizeof(timeout)) < 0)
+		{
+			close(s_up);
 			exit(1);
 		}
+
 		//PETICION DE CONEXION DE CLIENTE
-		if ((n = read(l,buf,MAX_BUF)) < 0 ){
+		if ((n = read(s_up,buf,MAX_BUF)) < 0 ){
 			perror("Error al recibir la peticion de conexion del cliente");
 		}
 
 		if(n != 4 || strncmp(buf, comandos[0], 3) != 0)
 		{
 			perror("El mensaje recibido no es el de conexion [CON].");
-			exit(1);
 		}else
 			printf("Recibido comando: %s | %s\n", buf, obtenerTiempo());
 		
 		//Construir el comando a ejecutar
 		if (sprintf(ack,"%s",comandos[3]) < 0)
 			perror("sprintf ");
-		if (write(l, ack, 4) < 0)
+		if (write(s_up, ack, 4) < 0)
 			perror("write 1 "); // ACK CONFIRMACION
+		else
+			printf("Enviado comando: %s | %s\n", ack, obtenerTiempo());
 	
 		// Iniciamos la actualizacion
-		update(l);
+		update(s_up);
 
-		if ((n = read(l,buf,MAX_BUF)) < 0 ){
+
+		if ((n = read(s_up,buf,MAX_BUF)) < 0 ){
 			perror("Error al recibir la peticion de desconexion del cliente");
 		}
 		if(n != 4 || strncmp(buf, comandos[5], 3) != 0)
 		{
 			perror("El mensaje recibido no es el de conexion [FIN].");
-			exit(1);
 		}else
 			printf("Recibido comando: %s | %s\n", buf, obtenerTiempo());
-		close(l);
+
+		// Cerramos socket de cliente
+		if(close(s_up) != -1)
+			printf("Cerrado socket cliente | %s\n", obtenerTiempo());
+		else
+			perror("Error: socket de cliente no cerrado.");
 	}
 }
 
@@ -173,6 +179,7 @@ void update(sock)
 			
 			/* CIERRE DEL FICHERO */
 			fclose(rec_file);
+
 			
 			remove(nombre_copia);
 			
@@ -184,13 +191,16 @@ void update(sock)
 		case COM_DEL:	
 			buf[n] = 0;	// Borrar EOL
 	
-			//sprintf(nombre,"%s",FILENAME,buf+4);
 			sprintf(nombre,"%s%s",FILENAME,buf+4);
 
-			remove(nombre);
+			if(remove(nombre) != -1)
+				printf("Realizada operacion: remove('%s') | %s\n", nombre, obtenerTiempo());
 			
 			sprintf(ack,"%s",comandos[3]);
-			write(sock, ack, 4); //ACK DE CONFIRMACION
+			
+			if (write(sock, ack, 4) > 0) //ACK DE CONFIRMACION
+				printf("Enviado comando: %s | %s\n", ack, obtenerTiempo());
+
 			
 			return; //se termina la conexion
 			
@@ -202,24 +212,16 @@ void update(sock)
 			temp[i-1] = 0;
 			sprintf(nombre,"%s%s",FILENAME,temp);
 
-			//i = posc(buf+4,';');
 			sprintf(nombre_nuevo,"%s%s",FILENAME,buf+i+4);
-			//printf("Nombre antiguo: %s; Nombre nuevo:%s\n",nombre,nombre_nuevo);
-			//printf("ant: %lu, nue: %lu\n",strlen(nombre), strlen(nombre_nuevo));
 
 			sprintf(cmd,"mv %s %s",nombre,nombre_nuevo);
-			//sprintf(cmd,"cp %s %s",nombre,nombre_nuevo);
 			
-			if (printf("%s\n",cmd) < 0){
-				perror("impr cmd");
-			}
-			system(cmd);
-			
-			//remove(nombre);
+			if (system(cmd) != -1)
+				printf("Realizada operacion: %s | %s\n", cmd, obtenerTiempo());
 			
 			sprintf(ack,"%s",comandos[3]);
-			write(sock, ack, 4); //ACK DE CONFIRMACION
-			
+			if(write(sock, ack, 4) > 0) //ACK DE CONFIRMACION
+				printf("Enviado comando: %s | %s\n", ack, obtenerTiempo());
 			return; //se termina la conexion	
 	}
 }
