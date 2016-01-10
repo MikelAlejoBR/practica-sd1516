@@ -4,7 +4,9 @@
 #include <stdlib.h>
 #include <sys/inotify.h>
 #include <unistd.h>
+#include <string.h>
 
+#include "protocolo.h"
 #include "inotify.h"
 
 /* Este fichero ha sido tomado directamente del man de inotify. */
@@ -15,7 +17,8 @@
  * argv is the list of watched directories.
  * Entry 0 of wd and argv is unused. */
 
-static int handle_events(int fd, int *wd, int wdlen, char* dir)
+static int handle_events(int sock, int fd, int *wd, int wdlen, char* 
+dir)
 {
 	/* Some systems cannot read integer variables if they are not
 	 * properly aligned. On other systems, incorrect alignment may
@@ -23,7 +26,7 @@ static int handle_events(int fd, int *wd, int wdlen, char* dir)
 	 * the inotify file descriptor should have the same alignment as
 	 * struct inotify_event. */
 	
-	char buf[EVBUFF_SIZE] 
+	char buf[MAX_BUFF] 
 	__attribute__ ((aligned(__alignof__(struct inotify_event))));
 	const struct inotify_event *event;
 	int i=0;
@@ -57,24 +60,24 @@ static int handle_events(int fd, int *wd, int wdlen, char* dir)
 			event = (const struct inotify_event *) ptr;
 		
 		/* Print event type */
+
+		if (event->mask & IN_CREATE) {
+			char buff[MAX_BUFF];
+			
+			if (event->len)
+				snprintf(buff, sizeof(buff), "%s/%s", dir, event->name);
+			sendFile(sock, buff);
+		}
 		
-		if (event->mask & IN_ATTRIB)
-			printf("Attributes changed: \n");
-		if (event->mask & IN_CREATE)
-			printf("File created: %s\n");
-		if (event->mask & IN_DELETE_SELF)
-			printf("File self deleted: \n");
-                if (event->mask & IN_DELETE)
+		if (event->mask & IN_DELETE) {
 			printf("File deleted: \n");
-		if (event->mask & IN_MODIFY)
+		}
+		if (event->mask & IN_MODIFY) {
 			printf("File modified: \n");
-		if (event->mask & IN_MOVED_FROM)
-			printf("File moved: \n");
-		if (event->mask & IN_MOVED_TO)
-			printf("In moved to: \n");
+			
+		}
 		
 		/* Print the name of the watched directory */
-                printf("%d\n",i);
 
 		if (wd[i] == event->wd) {
 			printf("%s/", dir);
@@ -120,10 +123,8 @@ int inotify(char dir[]) {
 		return(-1);
 	}
 	printf("%d\n",i);
-	wd[i] = inotify_add_watch(fd, dir, IN_ATTRIB | IN_CREATE | 
-	IN_MODIFY | IN_DELETE | 
-	IN_DELETE_SELF 
-	| IN_MOVED_FROM | IN_MOVED_TO);
+	wd[i] = inotify_add_watch(fd, dir, IN_CREATE | 
+	IN_MODIFY | IN_DELETE );
 	if (wd[i] == -1) {
 		fprintf(stderr, "Cannot watch '%s'\n", dir);
 		perror("inotify_add_watch");
@@ -161,7 +162,6 @@ int inotify(char dir[]) {
 			if (fds[0].revents & POLLIN) {
 
 				/* Console input is available. Empty stdin and quit */
-
 				while (read(STDIN_FILENO, &buf, 1) > 0 && buf != '\n')
 					continue;
 				break;
@@ -170,9 +170,18 @@ int inotify(char dir[]) {
 			if (fds[1].revents & POLLIN) {
 
 				/* Inotify events are available */
-
-				if(handle_events(fd, wd, 1, dir) < 0)
+				
+				int sock = getsockfd();
+				if (sock < 0)
 					return(-1);
+				
+				if (sendConnect(sock))
+					return(-1);
+
+				if(handle_events(sock, fd, wd, 1, dir) < 0)
+					return(-1);
+				
+				releasesockfd(sock);
 			}
 		}
 	}
