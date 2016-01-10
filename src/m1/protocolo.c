@@ -9,6 +9,8 @@
 #include <unistd.h>
 #include <sys/stat.h>
 
+#include <sys/ioctl.h>
+
 #include "protocolo.h"
 
 
@@ -16,6 +18,49 @@
 struct stat fileinfo;
 #define MAX_BUF 1024
 char buf[MAX_BUF];
+
+/*
+ * waitforack
+ * @param int sock
+ * 
+ * Waits for an ACK message of the server
+ * 
+ * @return -1 if something different from ACK was received
+ * @return 0 if TIMEOUT was reached
+ * @return 1 if ACK was received
+ */
+int waitforack(int sock) {
+		int returnvalue, acklength;
+		acklength = strlen("ACK");
+		char buffer[acklength];
+	
+		fd_set set;
+		struct timeval timeout;
+		
+		FD_ZERO(&set);
+		FD_SET(sock, &set);
+		
+		timeout.tv_sec = TIMEOUT;
+		timeout.tv_usec = 0;
+		
+		returnvalue = select(FD_SETSIZE, &set, NULL, NULL, &timeout);
+		
+		if (!returnvalue)
+			return(0);
+		
+		int length = 0;
+		ioctl(sock, FIONREAD, &length);
+		
+		if(length == acklength)
+			length = read(sock, buffer, length);
+		else
+			return(-1);
+		
+		if (strcmp("ACK", buffer))
+			return(-1);
+		else
+			return(1);
+}
 
 int sendack(int sock) {
     int bsent;
@@ -37,7 +82,7 @@ int senderr(int sock, int ecode) {
     return 0;
 }
 
-int sendFile(int sock, char * file){
+/*int sendFile(int sock, char * file){
     int bsent;
     if(stat(param, &fileinfo)<0)
         fprintf(stderr,"Fichero no encontrado\n");
@@ -62,7 +107,7 @@ int sendFile(int sock, char * file){
         if(bsent < sizeof(";"))
             return(-1);
         /*enviar fichero a trozos*/
-        
+        /*
         if((fp = fopen(file,"r")) == NULL) // Abrir fichero
         {
             fprintf(stderr,"Error al abrir el fichero %s.\n",file);
@@ -80,7 +125,7 @@ int sendFile(int sock, char * file){
         return 0;
         
     }
-}
+}*/
 int sendDelete(int sock, char * file)
 {
     int bsent;
