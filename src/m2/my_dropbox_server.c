@@ -141,10 +141,6 @@ void update(sock)
 			
 			sprintf(nombre_copia,"%s_minubeCOPY",buf+4);
 			sprintf(nombre_copia,"%s%s_minubeCOPY",FILENAME,buf+4);
-			
-			sprintf(ack,"%s",comandos[3]);
-			write(sock, ack, 4); //ACK DE CONFIRMACION
-			printf("Enviado comando: %s | %s\n", ack, obtenerTiempo());
 
 			/* REALIZAR LA COPIA DEL FICHERO CON EL COMANDO cp */
 			sprintf(cmd,"cp %s %s",nombre,nombre_copia);
@@ -153,19 +149,17 @@ void update(sock)
 			
 			if (remove(nombre) > 0)
 				printf("Realizada operacion: remove(%s) | %s\n", nombre, obtenerTiempo());
-
 			
-			/* RECIBIR TAMAÑO DEL FICHERO*/
-			if((n=recv(sock, buf, MAX_BUF, 0)) < 0)
-				return;
-			else
-				printf("Recibido tamaño del fichero: %s | %s\n", buf, obtenerTiempo());
+			i = posc(buf+4,';');
 
-			//tam_file = atoi(buffer);
-			tam_file = atoi(buf);
+			tam_file = atoi(buf+4+i);
 
 			/* CREACIÓN DEL FICHERO ACTUALIZADO */
 			rec_file = fopen(nombre, "w");
+			
+			sprintf(ack,"%s",comandos[3]);
+			write(sock, ack, 4); //ACK DE CONFIRMACION
+			printf("Enviado comando: %s | %s\n", ack, obtenerTiempo());
 
 			/* RECEPCIÓN DEL CONTENIDO DEL FICHERO */
 			while (((parte = recv(sock, buf, MAX_BUF, 0)) > 0) && (tam_file > 0))
