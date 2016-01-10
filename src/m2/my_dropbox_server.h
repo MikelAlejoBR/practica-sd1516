@@ -11,3 +11,4 @@ char * comandos[]  = {"CON","TRF", "DEL", "ACK", "REN", "FIN", NULL};
 void update(int sock);
 int posc( char cad[], char c);
 int busca_substring(char *string, char **strings);
+char * obtenerTiempo();
