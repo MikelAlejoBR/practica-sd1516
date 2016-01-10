@@ -65,7 +65,7 @@ dir)
 			char buff[MAX_BUFF];
 			
 			if (event->len)
-				snprintf(buff, sizeof(buff), "%s/%s", dir, event->name);
+				snprintf(buff, sizeof(buff), "%s", event->name);
 			sendFile(sock, buff);
 		}
 		
