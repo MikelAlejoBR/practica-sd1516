@@ -56,11 +56,7 @@ int sendConnect(int sock) {
 	bsent = write(sock, "CON", sizeof("CON"));
 	if (bsent < sizeof("CON"))
 		return(-1);
-	
-	if (waitforack(sock)==0)
-		return 0;
-	else
-		return 1;
+	return(0);
 }
 
 int sendack(int sock) {
@@ -89,19 +85,20 @@ int sendFile(int sock, char *path){
 	int tam = fileinfo.st_size;
 	char buff[MAX_BUF];
 	
-	/*if(stat(file, &fileinfo)<0)
+	if(stat(path, &fileinfo)<0)
 		fprintf(stderr,"Fichero no encontrado\n");
-	else
-	{*/
-		
-		snprintf(buff, sizeof(buff), "TRF;%s;%d\0", path, tam);
+	else {
+	
+		snprintf(buff, sizeof(buff), "TRF;%s;%d", path, tam);
 		bsent=write(sock, buff, strlen(buff));
+		
 		if(bsent < strlen(buff))
 			return(-1);
 
-		if (waitforack(sock) != 0) {
+		if (waitforack(sock) != 0)
 			return(-1);
-		}
+		
+		printf("ACK OKey!");
 		
 		/*bsent=write(sock, file, strlen(file));
 		if(bsent < sizeof(file))
@@ -118,14 +115,15 @@ int sendFile(int sock, char *path){
 		if(bsent < sizeof(";"))
 			return(-1); */
 		
-		/*enviar fichero a trozos*//*
+		/*enviar fichero a trozos*/
 		if((fp = fopen(path,"r")) == NULL) // Abrir fichero
 		{
 			fprintf(stderr,"Error al abrir el fichero %s.\n",path);
 			exit(1);
 		}
-		while((n=fread(buf,1,MAX_BUF,fp))==MAX_BUF) // Enviar fichero		
-//a trozos
+		
+		/* Enviar fichero a trozos */
+		while((n=fread(buf,1,MAX_BUF,fp))==MAX_BUF)
 			write(sock,buf,MAX_BUF);
 		if(ferror(fp)!=0)
 		{
@@ -136,7 +134,7 @@ int sendFile(int sock, char *path){
 		
 		return 0;
 		
-	//}*/
+	}
 }
 
 int sendDelete(int sock, char * file)
@@ -179,7 +177,7 @@ int sendfin(int sock) {
 	if(bsent < sizeof("FIN"))
 		return(-1);
 	
-	return waitforack(sock);
+	return 0;
 }
 
 int getsockfd(){
