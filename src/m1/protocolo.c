@@ -30,35 +30,35 @@ char buf[MAX_BUF];
  * @return 1 if ACK was received
  */
 int waitforack(int sock) {
-		int returnvalue, acklength;
-		acklength = strlen("ACK");
-		char buffer[acklength];
+	int returnvalue, acklength;
+	acklength = strlen("ACK");
+	char buffer[acklength];
+
+	fd_set set;
+	struct timeval timeout;
 	
-		fd_set set;
-		struct timeval timeout;
-		
-		FD_ZERO(&set);
-		FD_SET(sock, &set);
-		
-		timeout.tv_sec = TIMEOUT;
-		timeout.tv_usec = 0;
-		
-		returnvalue = select(FD_SETSIZE, &set, NULL, NULL, &timeout);
-		
-		if (!returnvalue)
-			return(0);
-		
-		int length = 0;
-		ioctl(sock, FIONREAD, &length);
-		
-		if(length == acklength)
-			length = read(sock, buffer, length);
-		else
-			return(-1);
-		
-		if (strcmp("ACK", buffer))
-			return(-1);
-		else
+	FD_ZERO(&set);
+	FD_SET(sock, &set);
+	
+	timeout.tv_sec = TIMEOUT;
+	timeout.tv_usec = 0;
+	
+	returnvalue = select(FD_SETSIZE, &set, NULL, NULL, &timeout);
+	
+	if (!returnvalue)
+		return(0);
+	
+	int length = 0;
+	ioctl(sock, FIONREAD, &length);
+	
+	if(length == acklength)
+		length = read(sock, buffer, length);
+	else
+		return(-1);
+	
+	if (strcmp("ACK", buffer))
+		return(-1);
+	else
 			return(1);
 }
 
