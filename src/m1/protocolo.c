@@ -29,9 +29,7 @@ FILE *fp;
  * @return 1 if TIMEOUT was reached
  */
 int waitforack(int sock) {
-	int acklength;
-	acklength = strlen("ACK");
-	char buffer[acklength];
+	char buffer[6];
 	
 	fd_set set;
 	struct timeval timeout;
@@ -45,14 +43,8 @@ int waitforack(int sock) {
 	if (!select(FD_SETSIZE, &set, NULL, NULL, &timeout))
 		return(1);
 	
-	int length = 0;
-	ioctl(sock, FIONREAD, &length);
-	
-	if(length == acklength)
-		length = read(sock, buffer, length);
-	else
-		return(-1);
-	
+	read(sock, buffer, sizeof(buffer));
+
 	if (strcmp("ACK", buffer))
 		return(-1);
 	else
@@ -91,20 +83,27 @@ int senderr(int sock, int ecode) {
 	return 0;
 }
 
-int sendFile(int sock, char * file){
+int sendFile(int sock, char *path){
 	int bsent;
 	int n;
 	int tam = fileinfo.st_size;
-	char str[20];
+	char buff[MAX_BUF];
 	
-	if(stat(file, &fileinfo)<0)
+	/*if(stat(file, &fileinfo)<0)
 		fprintf(stderr,"Fichero no encontrado\n");
 	else
-	{
-		bsent=write(sock, "TRF;" , sizeof("TRF;"));
-		if(bsent < sizeof("TRF;"))
+	{*/
+		
+		snprintf(buff, sizeof(buff), "TRF;%s;%d\0", path, tam);
+		bsent=write(sock, buff, strlen(buff));
+		if(bsent < strlen(buff))
 			return(-1);
-		bsent=write(sock, file, strlen(file));
+
+		if (waitforack(sock) != 0) {
+			return(-1);
+		}
+		
+		/*bsent=write(sock, file, strlen(file));
 		if(bsent < sizeof(file))
 			return(-1);
 		bsent=write(sock, ";" , sizeof(";"));
@@ -117,12 +116,12 @@ int sendFile(int sock, char * file){
 			return(-1);
 		bsent=write(sock, ";" , sizeof(";"));
 		if(bsent < sizeof(";"))
-			return(-1);
+			return(-1); */
 		
-		/*enviar fichero a trozos*/
-		if((fp = fopen(file,"r")) == NULL) // Abrir fichero
+		/*enviar fichero a trozos*//*
+		if((fp = fopen(path,"r")) == NULL) // Abrir fichero
 		{
-			fprintf(stderr,"Error al abrir el fichero %s.\n",file);
+			fprintf(stderr,"Error al abrir el fichero %s.\n",path);
 			exit(1);
 		}
 		while((n=fread(buf,1,MAX_BUF,fp))==MAX_BUF) // Enviar fichero		
@@ -137,7 +136,7 @@ int sendFile(int sock, char * file){
 		
 		return 0;
 		
-	}
+	//}*/
 }
 
 int sendDelete(int sock, char * file)
