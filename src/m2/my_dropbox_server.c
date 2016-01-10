@@ -13,22 +13,20 @@
 #include <netinet/in.h>
 #include <sys/select.h>
 #include <signal.h>
+#include <time.h>
 #include "my_dropbox_server.h"
 
 char ack[4];
 
 int main(int arhc, char *argv[])
 {
-	// char * txt = "REN;hola.txt;adios.txt";
-	// printf("posicion = %d", posc(txt, ';'));
-
 	int sock, n, l;   //socket, numero de bytes, numero de usuario, numero de comando, nuevo socket
 	struct sockaddr_in dir_serv, dir_cli;
 	char buf[MAX_BUF];
 	socklen_t sin_size, tam_dir;
 	
 	struct timeval timeout;      
-    timeout.tv_sec = 10;
+    timeout.tv_sec = 40;
     timeout.tv_usec = 0;
 
 	// Crear el socket
@@ -53,19 +51,6 @@ int main(int arhc, char *argv[])
 	// Tamaño de la direccion IP del cliente
 	tam_dir = sizeof(dir_cli);
 	
-	// Añadimos timeouts en las operaciones de entrada y salida del socket
-	if(setsockopt (sock, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout, sizeof(timeout)) < 0)
-	{
-		close(sock);
-		exit(1);
-	}	
-	
-	if(setsockopt (sock, SOL_SOCKET, SO_SNDTIMEO, (char *)&timeout, sizeof(timeout)) < 0)
-	{
-		close(sock);
-		exit(1);
-	}
-	
 	//Nos quedamos a la escucha de una conexion
 	listen(sock, 1);
 	sin_size = sizeof(struct sockaddr_in);
@@ -74,6 +59,18 @@ int main(int arhc, char *argv[])
 		if ((l = accept(sock,(struct sockaddr *)&dir_cli,&sin_size)) < 0)
 			return 0;
 			
+		// Añadimos timeouts en las operaciones de entrada y salida del socket
+		if(setsockopt (l, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout, sizeof(timeout)) < 0)
+		{
+			close(sock);
+			exit(1);
+		}	
+		
+		if(setsockopt (l, SOL_SOCKET, SO_SNDTIMEO, (char *)&timeout, sizeof(timeout)) < 0)
+		{
+			close(sock);
+			exit(1);
+		}
 		//PETICION DE CONEXION DE CLIENTE
 		if ((n = read(l,buf,MAX_BUF)) < 0 ){
 			perror("Error al recibir la peticion de conexion del cliente");
@@ -83,7 +80,8 @@ int main(int arhc, char *argv[])
 		{
 			perror("El mensaje recibido no es el de conexion [CON].");
 			exit(1);
-		}	
+		}else
+			printf("Recibido comando: %s | %s\n", buf, obtenerTiempo());
 		
 		//Construir el comando a ejecutar
 		if (sprintf(ack,"%s",comandos[3]) < 0)
@@ -101,8 +99,9 @@ int main(int arhc, char *argv[])
 		{
 			perror("El mensaje recibido no es el de conexion [FIN].");
 			exit(1);
-		}
-		close(sock);
+		}else
+			printf("Recibido comando: %s | %s\n", buf, obtenerTiempo());
+		close(l);
 	}
 }
 
@@ -118,7 +117,8 @@ void update(sock)
 	// Leer lo enviado por el cliente
 	if((n=read(sock,buf,MAX_BUF)) < 0)
 		perror("ERROR al leer el comando enviado por el cliente.");	
-	printf("Comando recibido: %s\n", buf);
+	else
+		printf("Recibido comando: %s | %s\n", buf, obtenerTiempo());
 	// Comprobar si el comando es conocido
 	if((comando=busca_substring(buf,comandos)) < 0)
 		perror("Encontrar el comando");
@@ -138,16 +138,22 @@ void update(sock)
 			
 			sprintf(ack,"%s",comandos[3]);
 			write(sock, ack, 4); //ACK DE CONFIRMACION
-			
+			printf("Enviado comando: %s | %s\n", ack, obtenerTiempo());
+
 			/* REALIZAR LA COPIA DEL FICHERO CON EL COMANDO cp */
 			sprintf(cmd,"cp %s %s",nombre,nombre_copia);
 			system(cmd);
+			printf("Ejecutada llamada al sistema: %s | %s\n", cmd, obtenerTiempo());
 			
-			remove(nombre);
+			if (remove(nombre) > 0)
+				printf("Realizada operacion: remove(%s) | %s\n", nombre, obtenerTiempo());
+
 			
 			/* RECIBIR TAMAÑO DEL FICHERO*/
 			if((n=recv(sock, buf, MAX_BUF, 0)) < 0)
 				return;
+			else
+				printf("Recibido tamaño del fichero: %s | %s\n", buf, obtenerTiempo());
 
 			//tam_file = atoi(buffer);
 			tam_file = atoi(buf);
@@ -248,6 +254,12 @@ int busca_substring(char *string, char **strings)
 		i++;
 	}
 	return -1;
+}
+
+char * obtenerTiempo(){
+	time_t t;
+	time(&t);
+	return asctime(localtime(&t));
 }
 
 void callback(){}
