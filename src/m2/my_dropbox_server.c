@@ -4,11 +4,8 @@
 #include <errno.h>
 #include <sys/types.h>
 #include <string.h>
-
-//Incluidos por Marcos
 #include <sys/syscall.h>
 #include <errno.h>
-
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <sys/select.h>
@@ -20,7 +17,7 @@ char ack[4];
 
 int main(int arhc, char *argv[])
 {
-	int sock, n, s_up;   //socket, numero de bytes, numero de usuario, numero de comando, nuevo socket
+	int sock, n, s_up;   //socket de escucha, numero de bytes, socket particular al cliente (funcion update)
 	struct sockaddr_in dir_serv, dir_cli;
 	char buf[MAX_BUF];
 	socklen_t sin_size, tam_dir;
@@ -56,6 +53,8 @@ int main(int arhc, char *argv[])
 	sin_size = sizeof(struct sockaddr_in);
 	
 	while(1){
+
+		// Aceptamos una conexión entrante
 		if ((s_up = accept(sock,(struct sockaddr *)&dir_cli,&sin_size)) < 0)
 			return 0;
 		
@@ -71,7 +70,7 @@ int main(int arhc, char *argv[])
 			exit(1);
 		}
 
-		//PETICION DE CONEXION DE CLIENTE
+		//PETICION DE CONEXION DE CLIENTE (Comando CON)
 		if ((n = read(s_up,buf,MAX_BUF)) < 0 ){
 			perror("Error al recibir la peticion de conexion del cliente");
 		}
@@ -82,18 +81,18 @@ int main(int arhc, char *argv[])
 		}else
 			printf("Recibido comando: %s | %s\n", buf, obtenerTiempo());
 		
-		//Construir el comando a ejecutar
+		// Construir ACK
 		if (sprintf(ack,"%s",comandos[3]) < 0)
 			perror("sprintf ");
 		if (write(s_up, ack, 4) < 0)
-			perror("write 1 "); // ACK CONFIRMACION
+			perror("write 1 "); // enviar ACK CONFIRMACION
 		else
 			printf("Enviado comando: %s | %s\n", ack, obtenerTiempo());
 	
 		// Iniciamos la actualizacion
 		update(s_up);
 
-
+		// Recepción comando FIN
 		if ((n = read(s_up,buf,MAX_BUF)) < 0 ){
 			perror("Error al recibir la peticion de desconexion del cliente");
 		}
@@ -109,9 +108,10 @@ int main(int arhc, char *argv[])
 		else
 			perror("Error: socket de cliente no cerrado.");
 	}
+	close(sock);
 }
 
-void update(sock)
+void update(int sock)
 {
 	int leido = 0;
 	int comando, tam_file, i, n;
