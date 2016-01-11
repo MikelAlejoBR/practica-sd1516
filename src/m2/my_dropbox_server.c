@@ -180,6 +180,8 @@ void update(int sock)
 			sprintf(ack,"%s",comandos[3]);
 			write(sock, ack, 4); //ACK DE CONFIRMACION
 			
+			backup(nombre, COM_TRF);
+
 			return; //se termina la conexion
 			
 		case COM_DEL:	
@@ -195,7 +197,8 @@ void update(int sock)
 			if (write(sock, ack, 4) > 0) //ACK DE CONFIRMACION
 				printf("Enviado comando: %s | %s\n", ack, obtenerTiempo());
 
-			
+			backup(nombre, COM_DEL);
+
 			return; //se termina la conexion
 			
 		case COM_REN:	
@@ -216,6 +219,8 @@ void update(int sock)
 			sprintf(ack,"%s",comandos[3]);
 			if(write(sock, ack, 4) > 0) //ACK DE CONFIRMACION
 				printf("Enviado comando: %s | %s\n", ack, obtenerTiempo());
+
+			backup(nombre, COM_REN);
 			return; //se termina la conexion	
 	}
 }
@@ -260,6 +265,103 @@ char * obtenerTiempo(){
 
 void callback(){}
 
-void backup(){}
+void backup(char *path, int comando){
 
-void heartbeat(){}
+/* CREAR SOCKET */
+int sock = getsockfd();
+	if (sock < 0)
+		return(-1);
+	
+	if (sendConnect(sock))
+		return(-1);
+
+switch(comando)
+{
+	case COM_TRF:
+	sendFile(sock , &path);
+	case COM_REN:
+		// Renombrar fichero no esta en cliente
+	case COM_DEL:
+		// Eliminar fichero
+}
+
+releasesockfd(sock);
+}
+
+int sendFile(int sock, char *path){
+	int bsent;
+	int n;
+	int tam = fileinfo.st_size;
+	char buff[MAX_BUF];
+	
+	if(stat(path, &fileinfo)<0)
+		fprintf(stderr,"Fichero no encontrado\n");
+	else {
+	
+		snprintf(buff, sizeof(buff), "TRF;%s;%d", path, tam);
+		bsent=write(sock, buff, strlen(buff));
+		
+		if(bsent < strlen(buff))
+			return(-1);
+
+		if (waitforack(sock) != 0)
+			return(-1);
+		
+		printf("ACK OKey!");
+		
+		/*enviar fichero a trozos*/
+		if((fp = fopen(path,"r")) == NULL) // Abrir fichero
+		{
+			fprintf(stderr,"Error al abrir el fichero %s.\n",path);
+			exit(1);
+		}
+		
+		/* Enviar fichero a trozos */
+		while((n=fread(buf,1,MAX_BUF,fp))==MAX_BUF)
+			write(sock,buf,MAX_BUF);
+		if(ferror(fp)!=0)
+		{
+			fprintf(stderr,"Error al enviar el fichero.\n");
+			exit(1);
+		}
+		write(sock,buf,n); // Enviar el ultimo trozo de fichero
+		
+		return 0;
+		
+	}
+}
+
+int getsockfd(){
+	int sock;
+	struct sockaddr_in serv_info;
+	
+	if((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+		perror("Error al crear el socket");
+		return(-1);
+	}
+	
+	memset(&serv_info, 0, sizeof(serv_info));
+	serv_info.sin_family = AF_INET;
+	serv_info.sin_port = htons(PORT);
+	
+	if(inet_aton("127.0.0.1", &serv_info.sin_addr) <= 0) {
+		fprintf(stderr, "Error en la direccion IP: 127.0.0.1\n");
+		return(-1);
+	}
+	
+	if(connect(sock, (struct sockaddr *) &serv_info, sizeof(serv_info)) 
+		< 0) {
+		perror("Error al intentar conectar con el servidor");
+	return(-1);
+		}
+		
+		return sock;
+}
+
+int releasesockfd(int sock) {
+	if(close(sock) < 0) {
+		fprintf(stderr, "Error al cerrar el socket");
+		return(-1);
+	}
+	return 0;
+}
