@@ -187,7 +187,6 @@ void update(sock)
 			
 			sprintf(ack,"%s",comandos[3]);
 			write(sock, ack, 4); //ACK DE CONFIRMACION
-			backup();
 			
 			return; //se termina la conexion
 			
@@ -268,60 +267,6 @@ char * obtenerTiempo(){
 }
 
 void callback(){}
-
-/* HAY QUE METER EN EL PRIMARIO */
-void backup(int sock, char *path, int comando){
-	switch(comando)
-	{
-		case COM_TRF:
-		sendFile(sock , &path);
-	}
-
-}
-
-int sendFile(int sock, char *path){
-	int bsent;
-	int n;
-	int tam = fileinfo.st_size;
-	char buff[MAX_BUF];
-	
-	if(stat(path, &fileinfo)<0)
-		fprintf(stderr,"Fichero no encontrado\n");
-	else {
-	
-		snprintf(buff, sizeof(buff), "TRF;%s;%d", path, tam);
-		bsent=write(sock, buff, strlen(buff));
-		
-		if(bsent < strlen(buff))
-			return(-1);
-
-		if (waitforack(sock) != 0)
-			return(-1);
-		
-		printf("ACK OKey!");
-		
-		/*enviar fichero a trozos*/
-		if((fp = fopen(path,"r")) == NULL) // Abrir fichero
-		{
-			fprintf(stderr,"Error al abrir el fichero %s.\n",path);
-			exit(1);
-		}
-		
-		/* Enviar fichero a trozos */
-		while((n=fread(buf,1,MAX_BUF,fp))==MAX_BUF)
-			write(sock,buf,MAX_BUF);
-		if(ferror(fp)!=0)
-		{
-			fprintf(stderr,"Error al enviar el fichero.\n");
-			exit(1);
-		}
-		write(sock,buf,n); // Enviar el ultimo trozo de fichero
-		
-		return 0;
-		
-	}
-}
-/*----------------------*/
 
 int ping(char *ipaddr)
 {
