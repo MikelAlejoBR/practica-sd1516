@@ -6,7 +6,7 @@ int waitforack(int sock);
 int sendConnect(int sock);
 int sendack(int sock);
 int senderr(int sock, int ecode);
-int sendFile(int sock, char * file);
+int sendFile(int sock, char * file, char * path);
 int sendfin(int sock);
 int getsockfd();
 int releasesockfd(int sock);

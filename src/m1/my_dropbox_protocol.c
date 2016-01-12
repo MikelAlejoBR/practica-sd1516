@@ -30,7 +30,8 @@ FILE *fp;
  */
 int waitforack(int sock) {
           char buffer[6];
-          
+          buffer[3]='\0';
+
           fd_set set;
           struct timeval timeout;
           
@@ -44,11 +45,12 @@ int waitforack(int sock) {
 	    return(1);
           
           read(sock, buffer, sizeof(buffer));
-          
+          printf("%s\n", buffer);
           if (strcmp("ACK", buffer))
 	    return(-1);
-          else
+          else{
 	    return(0);
+          }
 }
 
 /* 
@@ -123,34 +125,31 @@ int senderr(int sock, int ecode) {
  * @return -1 if something different from the command "ACK" is sent
  * @return 0 ACK is correctly sent
  */
-int sendFile(int sock, char *path){
+int sendFile(int sock, char *path, char *dir){
           int bsent;
           int n;
           int tam = fileinfo.st_size;
           
-//           if(stat(path, &fileinfo)<0)
-//           {
-// 	    fprintf(stderr,"Fichero no encontrado\n");
-// 	    return(-1);
-//           }
-//           
-//           else
-//           {
-	    
-	    //           snprintf(buf, sizeof(buf), "TRF;%s;%d;", path, tam);
-	    //           bsent=write(sock, buf, sizeof(buf));
-	    //           if(bsent < strlen(buf))
-	    // 	    return(-1);
-	    //           
-	    //           
-	    //           if (waitforack(sock) != 0) {
-	    // 	    return(-1);
-	    //           }
-	    //           
-	    //           sendfin(sock);
-	    
-	    bsent = write(sock, "TRF", sizeof("TRF"));
-	    if(bsent < sizeof("TRF"))
+          char  completo[80];
+          
+          printf("%s\n", dir);
+          strcpy(completo,dir);
+          strcat(completo,"/");
+
+          strcat(completo,path);
+    
+          
+          if(stat(completo, &fileinfo)<0)
+          {
+	    fprintf(stderr,"Fichero no encontrado\n");
+	    return(-1);
+          }
+          
+          else
+          {
+
+	    bsent = write(sock, "TRF;", sizeof("TRF;"));
+	    if(bsent < sizeof("TRF;"))
 	              return(-1);
 	    
 	    bsent=write(sock, path, strlen(path));
@@ -171,7 +170,7 @@ int sendFile(int sock, char *path){
 	              return(-1); 
 	    
 	    /*enviar fichero a trozos*/
-	    if((fp = fopen(path,"r")) == NULL) // Abrir fichero
+	    if((fp = fopen(completo,"r")) == NULL) // Abrir fichero
 	    {
 	              fprintf(stderr,"Error al abrir el fichero %s.\n",path);
 	              exit(1);
@@ -192,7 +191,7 @@ int sendFile(int sock, char *path){
 	    
 	    sendfin(sock);
 	    return 0;
-        //  }
+          }
 }
 
 /* 
@@ -216,8 +215,8 @@ int sendDelete(int sock, char * path)
           if(bsent < sizeof(";"))
 	    return(-1);
           
-          bsent=write(sock, path, sizeof(path));
-          if(bsent < sizeof(path))
+          bsent=write(sock, path, strlen(path));
+          if(bsent < strlen(path))
 	    return(-1);
           
           bsent=write(sock, ";" , sizeof(";"));
@@ -251,16 +250,16 @@ int sendRename(int sock, char * path1, char * path2)
           if(bsent < sizeof("REN;"))
 	    return(-1);
           
-          bsent=write(sock, path1, sizeof(path1));
-          if(bsent < sizeof(path1))
+          bsent=write(sock, path1, strlen(path1));
+          if(bsent < strlen(path1))
 	    return(-1);
           
           bsent=write(sock, ";" , sizeof(";"));
           if(bsent < sizeof(";"))
 	    return(-1);
           
-          bsent=write(sock, path2, sizeof(path2));
-          if(bsent < sizeof(path2))
+          bsent=write(sock, path2, strlen(path2));
+          if(bsent < strlen(path2))
 	    return(-1);
           
           bsent=write(sock, ";" , sizeof(";"));
