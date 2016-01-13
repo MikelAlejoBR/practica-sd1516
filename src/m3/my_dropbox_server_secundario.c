@@ -1,4 +1,4 @@
-#include <stdio.h>
+﻿#include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <errno.h>
@@ -13,7 +13,7 @@
 #include <sys/select.h>
 #include <signal.h>
 #include <time.h>
-#include "my_dropbox_server.h"
+#include "my_dropbox_server_secundario.h"
 
 #define      _GNU_SOURCE
 #include <arpa/inet.h>
