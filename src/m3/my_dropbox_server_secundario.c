@@ -17,6 +17,7 @@
 
 #define      _GNU_SOURCE
 #include <arpa/inet.h>
+#include <pthread.h>
 
 
 char ack[4];
@@ -35,7 +36,7 @@ int main(int arhc, char *argv[])
 
 	pthread_t idHilo;
 	
-	pthread_create (&idHilo; NULL, heartbeat, NULL);
+	pthread_create (&idHilo, NULL, heartbeat, NULL);
 
 	// Crear el socket
 	if((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0)
