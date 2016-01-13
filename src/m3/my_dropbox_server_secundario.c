@@ -1,4 +1,4 @@
-﻿#include <stdio.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <errno.h>
@@ -19,9 +19,8 @@
 #include <arpa/inet.h>
 #include <pthread.h>
 
-
 char ack[4];
-char ip[14];
+char ip[9]= "127.0.0.1";
 
 int main(int arhc, char *argv[])
 {
@@ -36,7 +35,7 @@ int main(int arhc, char *argv[])
 
 	pthread_t idHilo;
 	
-	pthread_create (&idHilo, NULL, heartbeat, NULL);
+	pthread_create(&idHilo, NULL, (void*) heartbeat, NULL);
 
 	// Crear el socket
 	if((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0)
@@ -236,8 +235,10 @@ int posc( char cad[], char c)
 {
    int pos = -1;
    int len = strlen( cad);
-   
-   for( int i = 0; /*pos == -1 && */i < len; i++){ // si quitas la condición pos == -1
+   int i;
+
+   for(i = 0;i < len; i++){
+ // si quitas la condición pos == -1
             // te devuelve la última posición encontrada (si es que hay más de 1)
       if(*(cad+i) == c)
          pos = i+1;
@@ -307,12 +308,13 @@ int isValidIpAddress(char *ipaddr)
     int result = inet_pton(AF_INET, ipaddr, &(sa.sin_addr));
     return result != 0;
 }
+
 void heartbeat(){
 		
   int status = 0;
   int intentos =0; 
 
-  while(true){	
+  while(1){	
 	  /*if(!isValidIpAddress(ip)) {
 	    printf("%s no es una direccion IP valida\n", ip);
 	  }*/
@@ -331,3 +333,5 @@ void heartbeat(){
 	wait(10000);
   }
 }
+
+
