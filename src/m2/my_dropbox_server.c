@@ -10,8 +10,14 @@
 #include <netinet/in.h>
 #include <sys/select.h>
 #include <signal.h>
+#include <sys/stat.h>
 #include <time.h>
 #include "my_dropbox_server.h"
+struct stat fileinfo;
+#define MAX_BUF 1024
+#define TIMEOUT 10;
+char buf[MAX_BUF];
+FILE *fp;
 
 char ack[4];
 
@@ -232,8 +238,9 @@ int posc( char cad[], char c)
 {
    int pos = -1;
    int len = strlen( cad);
-   
-   for( int i = 0; /*pos == -1 && */i < len; i++){ // si quitas la condición pos == -1
+   int i;
+
+   for(i = 0; /*pos == -1 && */i < len; i++){ // si quitas la condición pos == -1
             // te devuelve la última posición encontrada (si es que hay más de 1)
       if(*(cad+i) == c)
          pos = i+1;
@@ -265,7 +272,7 @@ char * obtenerTiempo(){
 
 void callback(){}
 
-void backup(char *path, int comando){
+int backup(char *path, int comando){
 
 /* CREAR SOCKET */
 int sock = getsockfd();
@@ -279,10 +286,13 @@ switch(comando)
 {
 	case COM_TRF:
 	sendFile(sock , &path);
+	return;
 	case COM_REN:
 		// Renombrar fichero no esta en cliente
+	return;
 	case COM_DEL:
 		// Eliminar fichero
+	return;
 }
 
 releasesockfd(sock);
@@ -364,4 +374,35 @@ int releasesockfd(int sock) {
 		return(-1);
 	}
 	return 0;
+}
+
+int sendConnect(int sock) {
+	int bsent;
+	bsent = write(sock, "CON", sizeof("CON"));
+	if (bsent < sizeof("CON"))
+		return(-1);
+	return(0);
+}
+
+int waitforack(int sock) {
+	char buffer[6];
+	
+	fd_set set;
+	struct timeval timeout;
+	
+	FD_ZERO(&set);
+	FD_SET(sock, &set);
+	
+	timeout.tv_sec = TIMEOUT;
+	timeout.tv_usec = 0;
+	
+	if (!select(FD_SETSIZE, &set, NULL, NULL, &timeout))
+		return(1);
+	
+	read(sock, buffer, sizeof(buffer));
+
+	if (strcmp("ACK", buffer))
+		return(-1);
+	else
+		return(0);
 }
