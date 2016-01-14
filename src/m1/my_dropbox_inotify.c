@@ -15,7 +15,9 @@
  * argc is the length of wd and argv.
  * argv is the list of watched directories.
  * Entry 0 of wd and argv is unused. */
-int flagMovido=0;
+
+int flagMovido = 0;
+
 static int handle_events(int sock, int fd, int *wd, int wdlen, char* dir)
 {
     /* Some systems cannot read integer variables if they are not
@@ -67,10 +69,7 @@ static int handle_events(int sock, int fd, int *wd, int wdlen, char* dir)
             printf("File '%s' created.\n", event->name);
             if (event->len)
                 sprintf(buf, "%s", event->name);
-            printf("antes\n");
             sendFile(sock, buf,dir);
-            printf("despues\n");
-            
         }
         
         if (event->mask & IN_DELETE_SELF)
@@ -87,13 +86,9 @@ static int handle_events(int sock, int fd, int *wd, int wdlen, char* dir)
         
         if (flagMovido==1)
         {
-            
-            printf("dentro\n");
             if (event->mask & IN_MOVED_TO)
             {
-                printf("dentrodentro\n");
-                
-                printf(" '%s' In moved to. \n", event->name);
+                printf("File '%s' in moved to. \n", event->name);
                 if (event->len)
                     sprintf(buf,   "%s", event->name);
                 sendRename(sock, temp,buf);
@@ -102,19 +97,16 @@ static int handle_events(int sock, int fd, int *wd, int wdlen, char* dir)
             else
             {
                 flagMovido=0;
-                
                 sendDelete(sock, temp);   
             }
-            
         }
         
         if (event->mask & IN_MOVED_FROM)
         {
             flagMovido=1;
-            printf("File '%s' moved or removed. \n", event->name);
+            printf("File '%s' moved. \n", event->name);
             if (event->len)
                 sprintf(temp, "%s", event->name);
-            //             sendDelete(sock, buf);
         }
         
         
@@ -122,14 +114,13 @@ static int handle_events(int sock, int fd, int *wd, int wdlen, char* dir)
         {
             printf(" '%s' In moved to. \n", event->name);
             if (event->len)
-                sprintf(buf,   "%s", event->name);
+                sprintf(buf, "%s", event->name);
             sendFile(sock, buf,dir);
         }
         
         
         if (wd[i] == event->wd) {
             printf("%s/", dir);
-            //break;
         }
         
         /* Print type of filesystem object */
@@ -225,29 +216,22 @@ int inotify(char dir[]) {
                 /* Establish connection with server (my_dropbox_server) */
                 if (sendConnect(sock)){
                     printf("errorSendsock\n");   
-                    
                     return(-1);
                 }
                 
                 /* Handle events */
                 if(handle_events(sock, fd, wd, 1, dir) < 0){
                     printf("errorHandle\n");   
-                    
                     return(-1);
                 }
                 
                 /* Close the socket (end connection with server) */
                 releasesockfd(sock);   
-                printf("fin\n");
-                
-                
             }
         }
     }
     
     /* Close inotify file descriptor */
-    printf("fin\n");
-    
     close(fd);
     free(wd);
 }

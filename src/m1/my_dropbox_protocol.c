@@ -31,7 +31,7 @@ FILE *fp;
 int waitforack(int sock) {
           char buffer[6];
           buffer[3]='\0';
-
+          
           fd_set set;
           struct timeval timeout;
           
@@ -45,7 +45,6 @@ int waitforack(int sock) {
 	    return(1);
           
           read(sock, buffer, sizeof(buffer));
-          printf("%s\n", buffer);
           if (strcmp("ACK", buffer))
 	    return(-1);
           else{
@@ -135,9 +134,7 @@ int sendFile(int sock, char *path, char *dir){
           printf("%s\n", dir);
           strcpy(completo,dir);
           strcat(completo,"/");
-
           strcat(completo,path);
-    
           
           if(stat(completo, &fileinfo)<0)
           {
@@ -147,44 +144,30 @@ int sendFile(int sock, char *path, char *dir){
           
           else
           {
-
-	    bsent = write(sock, "TRF;", sizeof("TRF;"));
-	    if(bsent < sizeof("TRF;"))
+	    sprintf(buf, "TRF;%s;%ld", path, tam);
+	    bsent=write(sock, buf, strlen(buf));
+	    
+	    if(bsent < strlen(buf))
 	              return(-1);
 	    
-	    bsent=write(sock, path, strlen(path));
-	    if(bsent < strlen(path))
-	              return(-1);
-	    
-	    bsent=write(sock, ";" , sizeof(";"));
-	    if(bsent < sizeof(";"))
-	              return(-1);
-	    
-	    sprintf(str,"%ld",tam);
-	    bsent=write(sock, str , sizeof(str));
-	    if(bsent < sizeof(str))
-	              return(-1);
-	    
-	    bsent=write(sock, ";" , sizeof(";"));
-	    if(bsent < sizeof(";"))
-	              return(-1); 
-	    
-	    /*enviar fichero a trozos*/
-	    if((fp = fopen(completo,"r")) == NULL) // Abrir fichero
+	    if (!S_ISDIR(fileinfo.st_mode)) // Si no es un directorio
 	    {
-	              fprintf(stderr,"Error al abrir el fichero %s.\n",path);
-	              exit(1);
+	              /*enviar fichero a trozos*/
+	              if((fp = fopen(completo,"r")) == NULL) // Abrir fichero
+	              {
+		        fprintf(stderr,"Error al abrir el fichero %s.\n",path);
+		        exit(1);
+	              }
+	              while((n=fread(buf,1,MAX_BUF,fp))==MAX_BUF) // Enviar fichero		
+		        //a trozos
+		        write(sock,buf,MAX_BUF);
+	              if(ferror(fp)!=0)
+	              {
+		        fprintf(stderr,"Error al enviar el fichero.\n");
+		        exit(1);
+	              }
+	              write(sock,buf,n); // Enviar el ultimo trozo de fichero
 	    }
-	    while((n=fread(buf,1,MAX_BUF,fp))==MAX_BUF) // Enviar fichero		
-	              //a trozos
-	              write(sock,buf,MAX_BUF);
-	    if(ferror(fp)!=0)
-	    {
-	              fprintf(stderr,"Error al enviar el fichero.\n");
-	              exit(1);
-	    }
-	    write(sock,buf,n); // Enviar el ultimo trozo de fichero
-	    
 	    if (waitforack(sock) != 0) {
 	              return(-1);
 	    }
@@ -207,20 +190,11 @@ int sendFile(int sock, char *path, char *dir){
 int sendDelete(int sock, char * path)
 {
           int bsent;
-          bsent = write(sock, "DEL", sizeof("DEL"));
-          if(bsent < sizeof("DEL"))
-	    return(-1);
           
-          bsent=write(sock, ";" , sizeof(";"));
-          if(bsent < sizeof(";"))
-	    return(-1);
+          sprintf(buf, "DEL;%s", path);
+          bsent = write(sock, buf, strlen(buf));
           
-          bsent=write(sock, path, strlen(path));
-          if(bsent < strlen(path))
-	    return(-1);
-          
-          bsent=write(sock, ";" , sizeof(";"));
-          if(bsent < sizeof(";"))
+          if(bsent < strlen(buf))
 	    return(-1);
           
           if (waitforack(sock) != 0) {
@@ -246,24 +220,11 @@ int sendDelete(int sock, char * path)
 int sendRename(int sock, char * path1, char * path2)
 {
           int bsent;
-          bsent = write(sock, "REN;", sizeof("REN;"));
-          if(bsent < sizeof("REN;"))
-	    return(-1);
           
-          bsent=write(sock, path1, strlen(path1));
-          if(bsent < strlen(path1))
-	    return(-1);
+          sprintf(buf, "REN;%s;%s", path1, path2);
+          bsent = write(sock, buf, strlen(buf));
           
-          bsent=write(sock, ";" , sizeof(";"));
-          if(bsent < sizeof(";"))
-	    return(-1);
-          
-          bsent=write(sock, path2, strlen(path2));
-          if(bsent < strlen(path2))
-	    return(-1);
-          
-          bsent=write(sock, ";" , sizeof(";"));
-          if(bsent < sizeof(";"))
+          if(bsent < strlen(buf))
 	    return(-1);
           
           if (waitforack(sock) != 0) {
