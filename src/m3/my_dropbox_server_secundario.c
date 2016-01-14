@@ -18,6 +18,7 @@
 #define      _GNU_SOURCE
 #include <arpa/inet.h>
 #include <pthread.h>
+#include <unistd.h>
 
 char ack[4];
 char ip[9]= "127.0.0.1";
@@ -330,7 +331,7 @@ void heartbeat(){
 			//Se ejecutaria el protocolo de elección debido a la recurrencia de fallos del primario
 		}	 
           }
-	wait(10000);
+	sleep(10);
   }
 }
 
